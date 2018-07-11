@@ -1,0 +1,114 @@
+---
+title: "Student Alcohol Consumption"
+author: "Brent Knight"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+library(readr)
+library(tidyverse)
+library(ROCR)
+library(tree)
+library(maptree)
+library(class)
+library(lattice)
+library(dplyr)
+```
+
+```{r, message=FALSE, warning=FALSE}
+success <- read.csv("C:/Users/Brent/Downloads/student-mat.csv", header = TRUE)
+```
+
+```{r, message=FALSE, warning=FALSE}
+success <- success %>% 
+    mutate(pass = as.factor(ifelse(G3 < 10, "no", "yes")))
+```
+
+```{r, message=FALSE, warning=FALSE}
+success$famsize <- ordered(success$famsize, levels = c("LE3", "GT3"))
+
+success$Medu <- ordered(success$Medu, levels = c(0:4), labels = c("0", "1", "2", "3", "4"))
+
+success$Fedu <- ordered(success$Fedu, levels = c(0:4), labels = c("0", "1", "2", "3", "4"))
+
+success$traveltime <- ordered(success$traveltime, levels = c(1:4), labels = c("1", "2", "3", "4"))
+
+success$studytime <- ordered(success$studytime, levels = c(1:4), labels = c("1", "2", "3", "4"))
+
+success$failures <- ordered(success$failures, levels = c(0:3), labels = c("0", "1", "2", "3"))
+
+success$famrel <- ordered(success$famrel, levels = c(1:5), labels = c("1", "2", "3", "4", "5"))
+
+success$freetime <- ordered(success$freetime, levels = c(1:5), labels = c("1", "2", "3", "4", "5"))
+
+success$goout <- ordered(success$goout, levels = c(1:5), labels = c("1", "2", "3", "4", "5"))
+
+success$Dalc <- ordered(success$Dalc, levels = c(1:5), labels = c("1", "2", "3", "4", "5"))
+
+success$Walc <- ordered(success$Walc, levels = c(1:5), labels = c("1", "2", "3", "4", "5"))
+
+success$health <- ordered(success$health, levels = c(1:5), labels = c("1", "2", "3", "4", "5"))
+```
+
+```{r, message=FALSE, warning=FALSE}
+success.subset <- success %>% select(school:G2, pass)
+```
+
+```{r}
+set.seed(1)
+randomsamp <- sample(1:nrow(success.subset), 316)
+success.train <- success.subset[randomsamp,]
+success.test <- success.subset[-randomsamp,]
+dim(success.train)
+dim(success.test)
+```
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+success.glm <- glm(pass ~ ., data = success.train, family = binomial)
+summary(success.glm)
+```
+
+```{r, message=FALSE, warning=FALSE}
+set.seed(1)
+success.tree <- tree(pass ~ ., data = success.train)
+success.cv <- cv.tree(success.tree, K = 10, FUN = prune.misclass)
+success.cv
+best.size <- 8
+```
+
+```{r, message=FALSE, warning=FALSE}
+success.prune <- prune.tree(success.tree,  best = best.size, method = "misclass")
+draw.tree(success.prune, nodeinfo = TRUE, cex = .5, cases = "obs")
+```
+
+```{r, message=FALSE, warning=FALSE}
+predictions <- predict(success.prune, success.test, type = "class")
+truth <- success.test$pass
+success.confusionmatrix <- table(truth, predictions)
+success.confusionmatrix
+TPR <- 48/(48 + 3)
+FPR <- 18/(18 + 10)
+TPR
+FPR
+```
+
+```{r, message=FALSE, warning=FALSE}
+success.predict <- predict(success.glm, success.test, type = "response")
+log.pred <- prediction(success.predict, success.test$pass)
+success.tree.pred <- predict(success.tree, success.test, type = "where")
+tree.pred <- prediction(success.tree.pred, success.test$pass)
+log.perf <- performance(log.pred, measure = "tpr", x.measure = "fpr")
+tree.perf <- performance(tree.pred, measure = "tpr", x.measure = "fpr")
+plot(log.perf, col = "red", lwd = 3, main = "ROC Curves")
+plot(tree.perf, col = "blue", lwd = 3, add = TRUE)
+```
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+log.auc <- performance(log.pred, "auc")@y.values
+tree.auc <- performance(tree.pred, "auc")@y.values
+log.auc
+tree.auc
+```
