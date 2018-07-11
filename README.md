@@ -1,4 +1,4 @@
-# Data-Mining-Classification-Project-
+# Data-Mining-Classification-Project
 
 Through the use of supervised learning, the project consisted of a classification problem using a dataset that contained the social, gender, and study data from secondary school students
 in Portugal. 
